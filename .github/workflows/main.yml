@@ -24,10 +24,12 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r requirements.txt
 
+      - name: Decode and Create Service Account File
+        run: echo "${{ secrets.GOOGLE_SHEETS_CREDENTIALS_JSON }}" | base64 --decode > ${{ github.workspace }}/service_account.json
+
       - name: Run News Pipeline Script
         env:
           NEWSDATA_API_KEY: ${{ secrets.NEWSDATA_API_KEY }}
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
           SPREADSHEET_NAME: ${{ secrets.SPREADSHEET_NAME }}
-          GOOGLE_SHEETS_CREDENTIALS_JSON: ${{ secrets.GOOGLE_SHEETS_CREDENTIALS_JSON }}
         run: python main.py
