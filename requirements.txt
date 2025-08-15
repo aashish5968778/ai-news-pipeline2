@@ -1,0 +1,6 @@
+requests
+gspread
+google-auth-oauthlib
+openai
+thefuzz
+python-levenshtein
