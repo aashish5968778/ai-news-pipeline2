@@ -2,16 +2,17 @@ import os
 import gspread
 import requests
 import openai
-import json # <-- New import
+import json
 from urllib.parse import urlparse
 from thefuzz import fuzz
+from datetime import datetime, timezone
 
 # --- Configuration ---
+# These will be set as environment variables in the cloud
 NEWSDATA_API_KEY = os.environ.get("NEWSDATA_API_KEY") 
 OPENAI_API_KEY = os.environ.get("OPENAI_API_KEY")
 SPREADSHEET_NAME = os.environ.get("SPREADSHEET_NAME")
 SERVICE_ACCOUNT_FILE = "service_account.json"
-# New environment variable for the JSON content
 GOOGLE_SHEETS_CREDENTIALS_JSON = os.environ.get("GOOGLE_SHEETS_CREDENTIALS_JSON")
 
 # Configure the OpenAI client
@@ -19,7 +20,7 @@ if OPENAI_API_KEY:
     openai.api_key = OPENAI_API_KEY
 
 def get_ai_summary(article_title, article_description):
-    # This function remains the same
+    """Uses OpenAI to generate a one-sentence summary."""
     if not all([article_description, openai.api_key]):
         return "Summary not available."
     try:
@@ -38,7 +39,7 @@ def main(event=None, context=None):
     """Main function with advanced duplicate checking"""
     print("Starting news pipeline with your preferred query...")
 
-    # --- UPDATED: Authenticate with Google Sheets ---
+    # --- Authenticate with Google Sheets ---
     try:
         if GOOGLE_SHEETS_CREDENTIALS_JSON:
             # Use credentials from GitHub Secrets (in the cloud)
@@ -55,7 +56,7 @@ def main(event=None, context=None):
         print(f"Error connecting to Google Sheets: {e}")
         return
 
-    # --- Fetch News (remains the same) ---
+    # --- Fetch News using your chosen URL parameters ---
     print("Fetching news from Newsdata.io...")
     api_url = "https://newsdata.io/api/1/latest"
     params = {'apikey': NEWSDATA_API_KEY, 'q': 'AI, openai, chatgpt, google', 'language': 'en', 'limit': 4}
@@ -68,10 +69,10 @@ def main(event=None, context=None):
         print(f"Error fetching from Newsdata.io API: {e}")
         return
 
-    # --- Process and Add to Sheet (remains the same) ---
+    # --- Process and Add to Sheet with Advanced Duplicate Check ---
     print(f"Found {len(articles)} articles. Processing and checking for duplicates...")
-    existing_links = set(worksheet.col_values(6))
-    existing_titles = set(works.col_values(2))
+    existing_links = set(worksheet.col_values(6)) # Assumes source link is in column F
+    existing_titles = set(worksheet.col_values(2)) # <-- FIX: Corrected variable name from 'works' to 'worksheet'
     
     SIMILARITY_THRESHOLD = 50
     rows_to_add = []
@@ -92,7 +93,8 @@ def main(event=None, context=None):
             if not is_semantically_duplicate:
                 ai_summary = get_ai_summary(title, article.get('description'))
                 domain = urlparse(source_link).netloc
-                row = ["", title, ai_summary, article.get('image_url'), article.get('source_id'), source_link, f"https://www.google.com/s2/favicons?domain={domain}&sz=64", article.get('pubDate'), "Published"]
+                timestamp = article.get('pubDate', datetime.now(timezone.utc).isoformat())
+                row = ["", title, ai_summary, article.get('image_url'), article.get('source_id'), source_link, f"https://www.google.com/s2/favicons?domain={domain}&sz=64", timestamp, "Published"]
                 rows_to_add.append(row)
                 
                 existing_links.add(source_link)
@@ -106,9 +108,10 @@ def main(event=None, context=None):
 
 # Use this block for local testing only
 if __name__ == "__main__":
-    NEWSDATA_API_KEY = "YOUR_NEWSDATA_KEY" 
+    # PASTE YOUR KEYS HERE FOR THE LOCAL TEST
+    NEWSDATA_API_KEY = "YOUR_NEWSDATA_KEY"
     OPENAI_API_KEY = "YOUR_OPENAI_KEY"
-    SPREADSHEET_NAME = "AI News Feed" # Needs this for local testing
+    SPREADSHEET_NAME = "AI News Feed"
     
     if OPENAI_API_KEY:
         openai.api_key = OPENAI_API_KEY
